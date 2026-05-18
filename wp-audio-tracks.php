@@ -47,6 +47,11 @@ class WPAudioTracks {
         
         // Open Graph / social preview meta (must be in <head> for WhatsApp, Facebook, etc.)
         add_action('wp_head', array($this, 'output_recording_social_meta'), 1);
+        
+        // Use featured image for SEO plugin Open Graph output (Yoast, Rank Math, etc.)
+        add_filter('wpseo_opengraph_image', array($this, 'filter_recording_og_image'));
+        add_filter('rank_math/opengraph/facebook/og_image', array($this, 'filter_recording_og_image'));
+        add_filter('aioseo_facebook_tags', array($this, 'filter_aioseo_facebook_tags'));
     }
     
     public function init() {
@@ -62,6 +67,21 @@ class WPAudioTracks {
     
     public function enqueue_scripts() {
         wp_enqueue_style('wp-audio-tracks-style', WP_AUDIO_TRACKS_PLUGIN_URL . 'assets/css/style.css', array(), WP_AUDIO_TRACKS_VERSION);
+        
+        if (is_singular('recording')) {
+            wp_enqueue_style(
+                'wp-audio-tracks-fonts',
+                'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0..1,0&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap',
+                array(),
+                null
+            );
+            wp_enqueue_style(
+                'wp-audio-tracks-player-ui',
+                WP_AUDIO_TRACKS_PLUGIN_URL . 'assets/css/player-ui.css',
+                array('wp-audio-tracks-style', 'wp-audio-tracks-fonts'),
+                WP_AUDIO_TRACKS_VERSION
+            );
+        }
         
         // Enqueue secure audio player first
         wp_enqueue_script('wp-audio-tracks-secure-player', WP_AUDIO_TRACKS_PLUGIN_URL . 'assets/js/secure-audio-player.js', array(), WP_AUDIO_TRACKS_VERSION, true);
@@ -308,8 +328,72 @@ class WPAudioTracks {
     }
     
     /**
+     * Featured image data for social previews (Facebook, WhatsApp, Twitter, etc.).
+     *
+     * @param int $post_id Recording post ID.
+     * @return array|null Keys: url, width, height, mime, alt — or null if no image.
+     */
+    private function get_recording_og_image_data($post_id) {
+        $thumbnail_id = get_post_thumbnail_id($post_id);
+        if (!$thumbnail_id) {
+            return null;
+        }
+        
+        $image = wp_get_attachment_image_src($thumbnail_id, 'full');
+        if (!$image || empty($image[0])) {
+            return null;
+        }
+        
+        $url = set_url_scheme($image[0], is_ssl() ? 'https' : 'http');
+        $alt = get_post_meta($thumbnail_id, '_wp_attachment_image_alt', true);
+        $mime = get_post_mime_type($thumbnail_id);
+        
+        return array(
+            'url'    => $url,
+            'width'  => (int) $image[1],
+            'height' => (int) $image[2],
+            'mime'   => $mime ? $mime : 'image/jpeg',
+            'alt'    => $alt !== '' ? $alt : get_the_title($post_id),
+        );
+    }
+    
+    /**
+     * Tell SEO plugins to use the recording featured image for Open Graph.
+     */
+    public function filter_recording_og_image($image) {
+        if (!is_singular('recording')) {
+            return $image;
+        }
+        
+        $data = $this->get_recording_og_image_data(get_queried_object_id());
+        return $data ? $data['url'] : $image;
+    }
+    
+    /**
+     * All in One SEO: set og:image from featured image.
+     */
+    public function filter_aioseo_facebook_tags($tags) {
+        if (!is_singular('recording') || !is_array($tags)) {
+            return $tags;
+        }
+        
+        $data = $this->get_recording_og_image_data(get_queried_object_id());
+        if ($data) {
+            $tags['og:image'] = $data['url'];
+            if ($data['width']) {
+                $tags['og:image:width'] = $data['width'];
+            }
+            if ($data['height']) {
+                $tags['og:image:height'] = $data['height'];
+            }
+        }
+        
+        return $tags;
+    }
+    
+    /**
      * Output Open Graph and Twitter Card meta for single recording pages.
-     * og:title = recording title; og:description = session (preview subtitle text).
+     * og:title = recording title; og:description = session; og:image = featured image.
      */
     public function output_recording_social_meta() {
         if (!is_singular('recording')) {
@@ -341,10 +425,7 @@ class WPAudioTracks {
             $og_description = substr($og_description, 0, 197) . '...';
         }
         
-        $og_image = '';
-        if (has_post_thumbnail($post_id)) {
-            $og_image = wp_get_attachment_image_url(get_post_thumbnail_id($post_id), 'large');
-        }
+        $image_data = $this->get_recording_og_image_data($post_id);
         
         echo '<meta name="description" content="' . esc_attr($og_description) . '" />' . "\n";
         echo '<meta property="og:type" content="article" />' . "\n";
@@ -353,16 +434,30 @@ class WPAudioTracks {
         echo '<meta property="og:url" content="' . esc_url($post_url) . '" />' . "\n";
         echo '<meta property="og:site_name" content="' . esc_attr($site_name) . '" />' . "\n";
         
-        if (!empty($og_image)) {
-            echo '<meta property="og:image" content="' . esc_url($og_image) . '" />' . "\n";
-            echo '<meta property="og:image:alt" content="' . esc_attr($post_title) . '" />' . "\n";
+        if ($image_data) {
+            echo '<meta property="og:image" content="' . esc_url($image_data['url']) . '" />' . "\n";
+            echo '<meta property="og:image:secure_url" content="' . esc_url(set_url_scheme($image_data['url'], 'https')) . '" />' . "\n";
+            if ($image_data['width'] > 0) {
+                echo '<meta property="og:image:width" content="' . esc_attr($image_data['width']) . '" />' . "\n";
+            }
+            if ($image_data['height'] > 0) {
+                echo '<meta property="og:image:height" content="' . esc_attr($image_data['height']) . '" />' . "\n";
+            }
+            echo '<meta property="og:image:type" content="' . esc_attr($image_data['mime']) . '" />' . "\n";
+            echo '<meta property="og:image:alt" content="' . esc_attr($image_data['alt']) . '" />' . "\n";
         }
         
-        echo '<meta name="twitter:card" content="' . (!empty($og_image) ? 'summary_large_image' : 'summary') . '" />' . "\n";
+        $twitter_card = $image_data ? 'summary_large_image' : 'summary';
+        echo '<meta name="twitter:card" content="' . esc_attr($twitter_card) . '" />' . "\n";
         echo '<meta name="twitter:title" content="' . esc_attr($post_title) . '" />' . "\n";
         echo '<meta name="twitter:description" content="' . esc_attr($og_description) . '" />' . "\n";
-        if (!empty($og_image)) {
-            echo '<meta name="twitter:image" content="' . esc_url($og_image) . '" />' . "\n";
+        if ($image_data) {
+            echo '<meta name="twitter:image" content="' . esc_url($image_data['url']) . '" />' . "\n";
+        }
+        
+        // Helps some crawlers discover the preview image explicitly.
+        if ($image_data) {
+            echo '<link rel="image_src" href="' . esc_url($image_data['url']) . '" />' . "\n";
         }
     }
     
@@ -493,8 +588,7 @@ class WPAudioTracks {
         $chunk_size = 8192; // 8KB chunks
         $total_chunks = ceil($file_size / $chunk_size);
         
-        // Estimate duration (rough calculation for MP3)
-        $duration = $this->estimate_audio_duration($file_path);
+        $duration = $this->get_audio_duration_seconds($file_path, $recording_file);
         
         $metadata = array(
             'duration' => $duration,
@@ -717,16 +811,41 @@ class WPAudioTracks {
         return $obfuscated;
     }
     
+    /**
+     * Get accurate audio duration in seconds (WordPress media meta, getID3, then estimate).
+     */
+    private function get_audio_duration_seconds($file_path, $recording_url = '') {
+        if (!empty($recording_url)) {
+            $attachment_id = attachment_url_to_postid($recording_url);
+            if ($attachment_id) {
+                $meta = wp_get_attachment_metadata($attachment_id);
+                if (!empty($meta['length']) && is_numeric($meta['length'])) {
+                    return max(1, (int) round((float) $meta['length']));
+                }
+            }
+        }
+        
+        if (!function_exists('wp_read_audio_metadata')) {
+            require_once ABSPATH . 'wp-admin/includes/media.php';
+        }
+        
+        if (function_exists('wp_read_audio_metadata')) {
+            $audio_meta = wp_read_audio_metadata($file_path);
+            if (!empty($audio_meta['length']) && is_numeric($audio_meta['length'])) {
+                return max(1, (int) round((float) $audio_meta['length']));
+            }
+        }
+        
+        return $this->estimate_audio_duration($file_path);
+    }
+    
     private function estimate_audio_duration($file_path) {
-        // Rough estimation for MP3 files
-        // This is a simplified calculation - in production you might want to use a proper audio library
         $file_size = filesize($file_path);
         
-        // Rough estimate: 128kbps MP3 ≈ 16KB per second
-        // This is very approximate and should be improved with proper audio analysis
-        $estimated_duration = $file_size / 16000; // 16KB per second
+        // Fallback: assume ~96kbps (common for speech/long recordings) ≈ 12KB/s
+        $estimated_duration = $file_size / 12000;
         
-        return max(1, round($estimated_duration)); // Minimum 1 second
+        return max(1, (int) round($estimated_duration));
     }
     
     public function track_recording_play() {

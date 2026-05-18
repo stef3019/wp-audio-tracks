@@ -1,0 +1,569 @@
+/**
+ * Recording player page UI (light mode base + dark-mode overrides)
+ */
+
+.wat-recording-page {
+    --wat-surface: #fff8f5;
+    --wat-on-surface: #211a16;
+    --wat-on-surface-variant: #534439;
+    --wat-primary: #8e4e14;
+    --wat-primary-container: #f4a261;
+    --wat-on-primary-container: #6f3800;
+    --wat-secondary-container: #ffb5c7;
+    --wat-tertiary: #695d4a;
+    --wat-surface-variant: #ede0d8;
+    --wat-surface-container: #f9ebe3;
+    --wat-outline-variant: #d8c2b5;
+    --wat-radius-xl: 1.5rem;
+    --wat-radius-full: 9999px;
+    --wat-font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --wat-pad: 24px;
+    --wat-gap-lg: 40px;
+    --wat-gap-md: 24px;
+    --wat-gap-sm: 12px;
+    font-family: var(--wat-font);
+    color: var(--wat-on-surface);
+    background: var(--wat-surface);
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+}
+
+.dark-mode .wat-recording-page {
+    --wat-surface: #1a1a1a;
+    --wat-on-surface: #e0e0e0;
+    --wat-on-surface-variant: #c8bcb4;
+    --wat-primary-container: #8e4e14;
+    --wat-on-primary-container: #fff8f5;
+    --wat-surface-variant: #3a332e;
+    --wat-surface-container: #2a2522;
+    --wat-outline-variant: #534439;
+}
+
+.wat-recording-page .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    line-height: 1;
+    user-select: none;
+}
+
+.wat-recording-page .material-symbols-filled {
+    font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Layout */
+.wat-recording-layout {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+    margin: 0;
+    overflow: visible;
+}
+
+.wat-recording-page .recording-header,
+.wat-recording-page .recording-player-container {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+}
+
+.wat-top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px var(--wat-pad);
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: color-mix(in srgb, var(--wat-surface) 92%, transparent);
+    backdrop-filter: blur(8px);
+}
+
+.wat-top-title {
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 28px;
+    margin: 0;
+    color: var(--wat-on-surface);
+}
+
+.wat-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 0 var(--wat-pad) 32px;
+}
+
+/* Hero artwork */
+.wat-hero {
+    width: 100%;
+    aspect-ratio: 1;
+    margin-top: var(--wat-gap-md);
+    border-radius: var(--wat-radius-xl);
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 2px 12px rgba(33, 26, 22, 0.08);
+}
+
+.wat-hero-gradient {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top right, var(--wat-secondary-container), var(--wat-primary-container));
+    opacity: 0.2;
+    pointer-events: none;
+}
+
+.wat-hero img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.wat-hero-placeholder {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, var(--wat-surface-container), var(--wat-surface-variant));
+}
+
+/* Metadata */
+.wat-metadata {
+    margin-top: var(--wat-gap-lg);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--wat-gap-sm);
+}
+
+.wat-title {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 36px;
+    letter-spacing: -0.01em;
+    margin: 0;
+    max-width: 280px;
+    color: var(--wat-on-surface);
+    text-wrap: balance;
+}
+
+.wat-pills {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.wat-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: var(--wat-radius-full);
+    background: color-mix(in srgb, var(--wat-tertiary) 10%, transparent);
+    color: var(--wat-on-surface-variant);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 20px;
+}
+
+.wat-pill-label {
+    opacity: 0.7;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+/* Player shell */
+.wat-player-shell {
+    margin-top: auto;
+    padding-top: var(--wat-gap-lg);
+}
+
+.wat-recording-page .secure-audio-player audio {
+    display: none !important;
+}
+
+.wat-recording-page .secure-audio-player-wrapper {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    max-width: none;
+    margin: 0;
+}
+
+.wat-player-controls {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wat-gap-md);
+}
+
+.wat-play-wrap {
+    display: flex;
+    justify-content: center;
+    margin-top: var(--wat-gap-md);
+}
+
+.wat-recording-page .play-pause-btn {
+    width: 80px;
+    height: 80px;
+    border: none;
+    border-radius: var(--wat-radius-full);
+    background: var(--wat-primary-container);
+    color: var(--wat-on-primary-container);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 24px rgba(142, 78, 20, 0.25);
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.wat-recording-page .play-pause-btn:hover {
+    opacity: 0.9;
+    transform: scale(1.02);
+    background: var(--wat-primary-container);
+}
+
+.wat-recording-page .play-pause-btn:active {
+    transform: scale(0.95);
+}
+
+.wat-recording-page .play-pause-btn .play-icon,
+.wat-recording-page .play-pause-btn .pause-icon {
+    font-size: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Progress + time */
+.wat-progress-block {
+    flex: none;
+    width: 100%;
+    gap: 8px;
+}
+
+.wat-time-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--wat-on-surface-variant);
+    padding: 0 4px;
+}
+
+.wat-recording-page .progress-bar {
+    position: relative;
+    height: 8px;
+    background: var(--wat-surface-variant);
+    border-radius: var(--wat-radius-full);
+    cursor: pointer;
+    margin: 0;
+    transition: background-color 0.2s;
+}
+
+.wat-recording-page .progress-bar:hover {
+    background: var(--wat-outline-variant);
+}
+
+.wat-recording-page .progress-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 0;
+    background: var(--wat-primary);
+    border-radius: var(--wat-radius-full);
+    pointer-events: none;
+}
+
+.wat-recording-page .progress-handle {
+    position: absolute;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    margin-top: -8px;
+    margin-left: -8px;
+    background: var(--wat-primary);
+    border: 2px solid var(--wat-surface);
+    border-radius: 50%;
+    box-shadow: 0 2px 6px rgba(33, 26, 22, 0.2);
+    cursor: grab;
+    transition: transform 0.15s;
+}
+
+.wat-recording-page .progress-handle:hover {
+    transform: scale(1.15);
+}
+
+/* Volume */
+.wat-volume-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 0 4px;
+}
+
+.wat-recording-page .mute-btn {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    color: var(--wat-on-surface-variant);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--wat-radius-full);
+    padding: 0;
+    flex-shrink: 0;
+}
+
+.wat-recording-page .mute-btn .material-symbols-outlined {
+    font-size: 22px;
+}
+
+.wat-recording-page .volume-slider {
+    flex: 1;
+    height: 8px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--wat-surface-variant);
+    border-radius: var(--wat-radius-full);
+    outline: none;
+    cursor: pointer;
+}
+
+.wat-recording-page .volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--wat-primary);
+    border: 2px solid var(--wat-surface);
+    box-shadow: 0 2px 6px rgba(33, 26, 22, 0.2);
+}
+
+.wat-recording-page .volume-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--wat-primary);
+    border: 2px solid var(--wat-surface);
+    box-shadow: 0 2px 6px rgba(33, 26, 22, 0.2);
+}
+
+.wat-volume-high {
+    font-size: 22px;
+    color: var(--wat-on-surface-variant);
+    flex-shrink: 0;
+}
+
+/* Loading / errors */
+.wat-recording-page .loading-indicator {
+    text-align: center;
+    color: var(--wat-on-surface-variant);
+    font-size: 14px;
+    padding: 12px;
+}
+
+.wat-recording-page .error-message {
+    text-align: center;
+    color: #ba1a1a;
+    background: #ffdad6;
+    border-radius: 1rem;
+    padding: 12px 16px;
+    font-size: 14px;
+}
+
+.dark-mode .wat-recording-page .error-message {
+    color: #ffdad6;
+    background: #93000a;
+}
+
+/* Description + footer on new layout */
+.wat-recording-page .recording-details {
+    padding: var(--wat-gap-lg) 0 0;
+    margin: 0;
+}
+
+.wat-recording-page .recording-description {
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--wat-on-surface-variant);
+}
+
+.wat-recording-page .recording-footer {
+    border-top: 1px solid var(--wat-outline-variant);
+    margin-top: var(--wat-gap-md);
+    padding-top: var(--wat-gap-md);
+    color: var(--wat-on-surface-variant);
+    font-size: 14px;
+}
+
+.wat-recording-page .theme-toggle-container {
+    top: 16px;
+    right: calc(50% - 240px + var(--wat-pad));
+}
+
+@media (max-width: 520px) {
+    .wat-recording-page .theme-toggle-container {
+        right: var(--wat-pad);
+    }
+}
+
+/* Resume playback modal */
+.resume-prompt {
+    --resume-surface: #ffffff;
+    --resume-on-surface: #211a16;
+    --resume-primary: #f4a261;
+    --resume-on-primary: #6f3800;
+    --resume-secondary: #ede0d8;
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: var(--wat-pad);
+    background: rgba(33, 26, 22, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    font-family: var(--wat-font, 'Plus Jakarta Sans', sans-serif);
+    pointer-events: auto;
+}
+
+.resume-prompt.resume-prompt--visible {
+    opacity: 1;
+}
+
+.resume-prompt-content {
+    width: 100%;
+    max-width: 320px;
+    padding: 32px 28px;
+    text-align: center;
+    background: var(--resume-surface);
+    color: var(--resume-on-surface);
+    border-radius: var(--wat-radius-xl);
+    box-shadow: 0 12px 40px rgba(33, 26, 22, 0.18);
+    animation: wat-slide-in 0.3s ease-out;
+    pointer-events: auto;
+}
+
+@keyframes wat-slide-in {
+    from {
+        transform: translateY(-16px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.resume-prompt p {
+    margin: 0 0 24px;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 28px;
+    color: var(--resume-on-surface);
+}
+
+.resume-prompt-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+}
+
+.resume-prompt .resume-btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: var(--wat-radius-full);
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.resume-prompt .resume-btn:hover {
+    opacity: 0.9;
+}
+
+.resume-prompt .resume-btn:active {
+    transform: scale(0.97);
+}
+
+.resume-prompt .resume-btn[data-action="resume"] {
+    background: var(--resume-primary);
+    color: var(--resume-on-primary);
+}
+
+.resume-prompt .resume-btn[data-action="restart"] {
+    background: var(--resume-secondary);
+    color: var(--resume-on-surface);
+}
+
+.dark-mode .resume-prompt {
+    --resume-surface: #2a2522;
+    --resume-on-surface: #e0e0e0;
+    --resume-primary: #f4a261;
+    --resume-on-primary: #fff8f5;
+    --resume-secondary: #3a332e;
+    background: rgba(0, 0, 0, 0.65);
+}
+
+/* Gravity Forms submit */
+.wat-recording-page .gform_wrapper .gform_footer input[type="submit"],
+.wat-recording-page .gform_wrapper .gform_footer button[type="submit"],
+.wat-recording-page .gform_wrapper input.gform_button,
+.wat-recording-page .gform_wrapper button.gform_button {
+    background: var(--wat-primary-container) !important;
+    color: var(--wat-on-primary-container) !important;
+    border: none !important;
+    border-radius: var(--wat-radius-full) !important;
+    padding: 14px 32px !important;
+    min-height: 48px;
+    font-family: var(--wat-font) !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    line-height: 1.25 !important;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(142, 78, 20, 0.2);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.wat-recording-page .gform_wrapper .gform_footer input[type="submit"]:hover,
+.wat-recording-page .gform_wrapper .gform_footer button[type="submit"]:hover,
+.wat-recording-page .gform_wrapper input.gform_button:hover,
+.wat-recording-page .gform_wrapper button.gform_button:hover {
+    opacity: 0.92;
+    transform: scale(1.02);
+}
+
+.wat-recording-page .gform_wrapper .gform_footer input[type="submit"]:active,
+.wat-recording-page .gform_wrapper .gform_footer button[type="submit"]:active,
+.wat-recording-page .gform_wrapper input.gform_button:active,
+.wat-recording-page .gform_wrapper button.gform_button:active {
+    transform: scale(0.98);
+}
+
+.dark-mode .wat-recording-page .gform_wrapper .gform_footer input[type="submit"],
+.dark-mode .wat-recording-page .gform_wrapper .gform_footer button[type="submit"],
+.dark-mode .wat-recording-page .gform_wrapper input.gform_button,
+.dark-mode .wat-recording-page .gform_wrapper button.gform_button {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}

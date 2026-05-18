@@ -3,6 +3,25 @@
  * 
  * Styles for the audio recording plugin frontend display
  */
+/* Site Logo*/
+div#headerimg h1 {
+    font-family: 'Plus Jakarta Sans';
+    text-decoration: none;
+    border-bottom: none;
+    background: #efe8e4;
+    text-align: center;
+    padding: 0px 5px 10px;
+    width: 80vw;
+    margin: 10px auto !important;
+    border-radius: 30px;
+}
+
+div#headerimg h1 a {
+    color: grey;
+    font-size: 18px;
+    text-decoration: none;
+    line-height: 1em;
+}
 
 /* Main Container */
 .wp-audio-tracks-container {
@@ -1370,24 +1389,6 @@
 
 .dark-mode .wake-lock-indicator:hover {
     opacity: 1;
-}
-
-.dark-mode .resume-prompt-content {
-    background: #fff;
-    color: #000;
-}
-
-.dark-mode .resume-prompt p {
-    color: #000;
-}
-
-.dark-mode .resume-btn {
-    background: #4a9eff !important;
-    color: white !important;
-}
-
-.dark-mode .resume-btn:hover {
-    background: #6bb6ff !important;
 }
 
 .dark-mode .resume-indicator {

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Secure Audio Player
  * 
  * A custom JavaScript audio player with advanced security measures
@@ -86,32 +86,35 @@ class SecureAudioPlayer {
     createPlayerUI() {
         this.container.innerHTML = `
             <div class="secure-audio-player-wrapper">
-                <div class="player-controls">
-                    <button class="play-pause-btn" aria-label="Play/Pause">
-                        <span class="play-icon">▶</span>
-                        <span class="pause-icon" style="display: none;">⏸</span>
-                    </button>
+                <div class="player-controls wat-player-controls">
+                    <div class="wat-play-wrap">
+                        <button type="button" class="play-pause-btn" aria-label="Play">
+                            <span class="play-icon material-symbols-outlined material-symbols-filled" aria-hidden="true">play_arrow</span>
+                            <span class="pause-icon material-symbols-outlined material-symbols-filled" aria-hidden="true" style="display: none;">pause</span>
+                        </button>
+                    </div>
                     
-                    <div class="progress-container">
-                        <div class="progress-bar">
-                            <div class="progress-fill"></div>
-                            <div class="progress-handle"></div>
-                        </div>
-                        <div class="time-display">
+                    <div class="progress-container wat-progress-block">
+                        <div class="wat-time-row time-display">
                             <span class="current-time">0:00</span>
                             <span class="duration">0:00</span>
                         </div>
+                        <div class="progress-bar wat-progress-bar" role="slider" aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                            <div class="progress-fill wat-progress-fill"></div>
+                            <div class="progress-handle wat-progress-handle"></div>
+                        </div>
                     </div>
-                    
-                    <div class="volume-control">
-                        <button class="mute-btn" aria-label="Mute/Unmute">
-                            <span class="volume-icon">🔊</span>
-                            <span class="mute-icon" style="display: none;">🔇</span>
+
+                    <div class="volume-control wat-volume-row">
+                        <button type="button" class="mute-btn" aria-label="Mute">
+                            <span class="volume-icon material-symbols-outlined" aria-hidden="true">volume_down</span>
+                            <span class="mute-icon material-symbols-outlined" aria-hidden="true" style="display: none;">volume_off</span>
                         </button>
-                        <input type="range" class="volume-slider" min="0" max="100" value="100">
+                        <input type="range" class="volume-slider wat-volume-slider" min="0" max="100" value="100" aria-label="Volume">
+                        <span class="wat-volume-high material-symbols-outlined" aria-hidden="true">volume_up</span>
                     </div>
+
                 </div>
-                
                 <div class="loading-indicator" style="display: none;">
                     <div class="spinner"></div>
                     <span>Loading audio...</span>
@@ -205,10 +208,10 @@ class SecureAudioPlayer {
             }
             
             const metadata = await response.json();
-            this.duration = metadata.duration;
             this.totalChunks = metadata.totalChunks;
             this.chunkSize = metadata.chunkSize;
             this.fileSize = metadata.fileSize;
+            this.duration = metadata.duration || 0;
             
             // Determine if this is a large file that might cause crashes
             this.isLargeFile = this.fileSize > 10 * 1024 * 1024; // 10MB threshold
@@ -224,6 +227,7 @@ class SecureAudioPlayer {
             
             // console.log('Audio metadata loaded:', metadata);
             
+            await this.probeAudioDuration(metadata.duration);
             this.updateDurationDisplay();
             this.hideLoading();
             
@@ -240,6 +244,70 @@ class SecureAudioPlayer {
             console.error('Failed to load audio metadata:', error);
             await this.handleNetworkError(error, 'loading audio metadata');
         }
+    }
+    
+    /**
+     * Read real duration from the audio file (overrides rough server estimate).
+     */
+    async probeAudioDuration(fallbackDuration = 0) {
+        const url = `${this.options.serverUrl}/secure-audio/${this.options.recordingId}/`;
+        
+        return new Promise((resolve) => {
+            const audio = document.createElement('audio');
+            audio.preload = 'metadata';
+            audio.style.cssText = 'position:absolute;width:0;height:0;opacity:0;pointer-events:none;';
+            
+            let settled = false;
+            const finish = () => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                audio.removeEventListener('loadedmetadata', onLoaded);
+                audio.removeEventListener('durationchange', onLoaded);
+                audio.removeEventListener('error', onError);
+                audio.src = '';
+                audio.load();
+                if (audio.parentNode) {
+                    audio.parentNode.removeChild(audio);
+                }
+                resolve();
+            };
+            
+            const applyDuration = () => {
+                if (audio.duration && isFinite(audio.duration) && audio.duration > 0) {
+                    this.duration = audio.duration;
+                    return true;
+                }
+                return false;
+            };
+            
+            const onLoaded = () => {
+                if (applyDuration()) {
+                    finish();
+                }
+            };
+            
+            const onError = () => {
+                if (!this.duration && fallbackDuration > 0) {
+                    this.duration = fallbackDuration;
+                }
+                finish();
+            };
+            
+            audio.addEventListener('loadedmetadata', onLoaded);
+            audio.addEventListener('durationchange', onLoaded);
+            audio.addEventListener('error', onError);
+            document.body.appendChild(audio);
+            audio.src = url;
+            
+            setTimeout(() => {
+                if (!applyDuration() && fallbackDuration > 0) {
+                    this.duration = fallbackDuration;
+                }
+                finish();
+            }, 12000);
+        });
     }
     
     async preloadAudio() {
@@ -690,7 +758,10 @@ class SecureAudioPlayer {
             
             const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
             this.audioBuffer = audioBuffer;
-            // console.log(`Full audio decoded successfully, duration: ${audioBuffer.duration}s`);
+            if (audioBuffer.duration && isFinite(audioBuffer.duration) && audioBuffer.duration > 0) {
+                this.duration = audioBuffer.duration;
+                this.updateDurationDisplay();
+            }
             return audioBuffer;
             
         } catch (error) {
@@ -732,10 +803,12 @@ class SecureAudioPlayer {
         
         if (this.isPlaying) {
             playIcon.style.display = 'none';
-            pauseIcon.style.display = 'inline';
+            pauseIcon.style.display = 'inline-flex';
+            this.container.querySelector('.play-pause-btn').setAttribute('aria-label', 'Pause');
         } else {
-            playIcon.style.display = 'inline';
+            playIcon.style.display = 'inline-flex';
             pauseIcon.style.display = 'none';
+            this.container.querySelector('.play-pause-btn').setAttribute('aria-label', 'Play');
         }
     }
     
@@ -948,9 +1021,9 @@ class SecureAudioPlayer {
         
         if (volumeSlider.value == 0) {
             volumeIcon.style.display = 'none';
-            muteIcon.style.display = 'inline';
+            muteIcon.style.display = 'inline-flex';
         } else {
-            volumeIcon.style.display = 'inline';
+            volumeIcon.style.display = 'inline-flex';
             muteIcon.style.display = 'none';
         }
     }
@@ -1226,80 +1299,25 @@ class SecureAudioPlayer {
             <div class="resume-prompt-content">
                 <p>Resume from ${timeString}?</p>
                 <div class="resume-prompt-buttons">
-                    <button class="resume-btn" data-action="resume">Resume</button>
-                    <button class="resume-btn" data-action="restart">Start Over</button>
+                    <button type="button" class="resume-btn" data-action="resume">Resume</button>
+                    <button type="button" class="resume-btn" data-action="restart">Start Over</button>
                 </div>
             </div>
         `;
         
-        // Style the prompt
-        prompt.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            pointer-events: auto;
-        `;
-        
-        // Prevent clicking outside the modal from closing it
         prompt.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
         });
-        
+
         const content = prompt.querySelector('.resume-prompt-content');
-        content.style.cssText = `
-            background: white;
-            color: #000;
-            padding: 30px;
-            border-radius: 8px;
-            text-align: center;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-            max-width: 300px;
-            pointer-events: auto;
-        `;
-        
-        // Prevent clicking on content from bubbling up
         content.addEventListener('click', (e) => {
             e.stopPropagation();
         });
-        
-        const buttons = prompt.querySelector('.resume-prompt-buttons');
-        buttons.style.cssText = `
-            margin-top: 20px;
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        `;
-        
-        const buttonStyle = `
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background 0.3s ease;
-        `;
-        
+
         const resumeBtn = prompt.querySelector('[data-action="resume"]');
         const restartBtn = prompt.querySelector('[data-action="restart"]');
-        
-        resumeBtn.style.cssText = buttonStyle + 'background: #0073aa; color: white;';
-        restartBtn.style.cssText = buttonStyle + 'background: #666; color: white;';
-        
-        resumeBtn.onmouseover = () => resumeBtn.style.background = '#005a87';
-        resumeBtn.onmouseout = () => resumeBtn.style.background = '#0073aa';
-        restartBtn.onmouseover = () => restartBtn.style.background = '#555';
-        restartBtn.onmouseout = () => restartBtn.style.background = '#666';
-        
+
         // Add event listeners
         resumeBtn.addEventListener('click', async () => {
             // Clean up keyboard event listeners
@@ -1383,11 +1401,10 @@ class SecureAudioPlayer {
             document.removeEventListener('keyup', preventKeyup, true);
         };
         
-        // Add to page and fade in
         document.body.appendChild(prompt);
-        setTimeout(() => {
-            prompt.style.opacity = '1';
-        }, 100);
+        requestAnimationFrame(() => {
+            prompt.classList.add('resume-prompt--visible');
+        });
     }
     
     showResumeIndicator(resumedTime) {
