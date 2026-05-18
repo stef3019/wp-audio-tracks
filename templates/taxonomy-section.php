@@ -10,8 +10,8 @@ get_header(); ?>
 <div class="wp-audio-tracks-container">
     <div class="theme-toggle-container">
         <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
-            <span class="theme-toggle-icon light-icon">☀️</span>
-            <span class="theme-toggle-icon dark-icon">🌙</span>
+            <span class="theme-toggle-icon light-icon" aria-hidden="true">&#9728;&#65039;</span>
+            <span class="theme-toggle-icon dark-icon" aria-hidden="true">&#127769;</span>
         </button>
     </div>
     
