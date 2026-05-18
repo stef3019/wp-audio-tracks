@@ -1258,6 +1258,7 @@ class SecureAudioPlayer {
         const content = prompt.querySelector('.resume-prompt-content');
         content.style.cssText = `
             background: white;
+            color: #000;
             padding: 30px;
             border-radius: 8px;
             text-align: center;

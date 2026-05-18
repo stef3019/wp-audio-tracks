@@ -60,7 +60,7 @@
 }
 
 .theme-toggle.system-mode::after {
-    content: '🔄';
+    content: '\1F504';
     position: absolute;
     font-size: 0.8em;
     bottom: -2px;
@@ -188,9 +188,19 @@
 }
 
 .security-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.2em;
+    height: 1.2em;
     font-size: 1.2em;
+    line-height: 1;
     color: #666;
     opacity: 0.8;
+}
+
+.security-icon::before {
+    content: '\1F512';
 }
 
 .secure-audio-player {
@@ -306,7 +316,7 @@
 .resume-prompt p {
     margin: 0 0 20px 0;
     font-size: 16px;
-    color: #333;
+    color: #000;
 }
 
 .resume-indicator {
@@ -1363,12 +1373,12 @@
 }
 
 .dark-mode .resume-prompt-content {
-    background: #2a2a2a;
-    color: #fff;
+    background: #fff;
+    color: #000;
 }
 
 .dark-mode .resume-prompt p {
-    color: #fff;
+    color: #000;
 }
 
 .dark-mode .resume-btn {
@@ -1498,6 +1508,19 @@
     background: #4a9eff;
     border-color: #4a9eff;
     color: #fff;
+}
+
+/* Gravity Forms – dark mode labels */
+.dark-mode .gform_wrapper label,
+.dark-mode .gform_wrapper .gfield_label,
+.dark-mode .gform_wrapper .gform-field-label,
+.dark-mode .gform_wrapper legend.gfield_label,
+.dark-mode .gform_wrapper .gfield_label_before_complex,
+.dark-mode .gform_wrapper .ginput_complex label,
+.dark-mode .gform_wrapper .gfield_checkbox label,
+.dark-mode .gform_wrapper .gfield_radio label,
+.dark-mode .gform_wrapper .gfield_consent_label {
+    color: #fff !important;
 }
 
 /* Small Mobile Styles */

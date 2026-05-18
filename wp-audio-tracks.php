@@ -31,11 +31,9 @@ class WPAudioTracks {
         add_action('admin_enqueue_scripts', array($this, 'admin_enqueue_scripts'));
         add_action('admin_init', array($this, 'admin_init'));
         
-        // Hook for handling secure audio file serving
+        // Serve secure audio as early as possible (before theme/plugins add output)
+        add_action('parse_request', array($this, 'maybe_serve_secure_audio'), 0);
         add_action('template_redirect', array($this, 'handle_secure_audio'));
-        
-        // Alternative method using init hook
-        add_action('init', array($this, 'handle_secure_audio_alt'));
         
         // Add test endpoint for debugging
         add_action('init', array($this, 'add_test_endpoint'));
@@ -46,6 +44,9 @@ class WPAudioTracks {
         
         // Add sorting for play count column
         add_action('pre_get_posts', array($this, 'handle_recording_sorting'));
+        
+        // Open Graph / social preview meta (must be in <head> for WhatsApp, Facebook, etc.)
+        add_action('wp_head', array($this, 'output_recording_social_meta'), 1);
     }
     
     public function init() {
@@ -306,38 +307,161 @@ class WPAudioTracks {
         return $template;
     }
     
+    /**
+     * Output Open Graph and Twitter Card meta for single recording pages.
+     * og:title = recording title; og:description = session (preview subtitle text).
+     */
+    public function output_recording_social_meta() {
+        if (!is_singular('recording')) {
+            return;
+        }
+        
+        $post_id = get_queried_object_id();
+        if (!$post_id) {
+            return;
+        }
+        
+        $post_title = get_the_title($post_id);
+        $post_url = get_permalink($post_id);
+        $session = get_post_meta($post_id, '_recording_session', true);
+        $site_name = get_bloginfo('name');
+        
+        $og_description = !empty($session) ? $session : '';
+        if ($og_description === '') {
+            $excerpt = get_post_field('post_excerpt', $post_id);
+            if (!empty($excerpt)) {
+                $og_description = wp_strip_all_tags($excerpt);
+            }
+        }
+        if ($og_description === '') {
+            $og_description = $site_name;
+        }
+        
+        if (strlen($og_description) > 200) {
+            $og_description = substr($og_description, 0, 197) . '...';
+        }
+        
+        $og_image = '';
+        if (has_post_thumbnail($post_id)) {
+            $og_image = wp_get_attachment_image_url(get_post_thumbnail_id($post_id), 'large');
+        }
+        
+        echo '<meta name="description" content="' . esc_attr($og_description) . '" />' . "\n";
+        echo '<meta property="og:type" content="article" />' . "\n";
+        echo '<meta property="og:title" content="' . esc_attr($post_title) . '" />' . "\n";
+        echo '<meta property="og:description" content="' . esc_attr($og_description) . '" />' . "\n";
+        echo '<meta property="og:url" content="' . esc_url($post_url) . '" />' . "\n";
+        echo '<meta property="og:site_name" content="' . esc_attr($site_name) . '" />' . "\n";
+        
+        if (!empty($og_image)) {
+            echo '<meta property="og:image" content="' . esc_url($og_image) . '" />' . "\n";
+            echo '<meta property="og:image:alt" content="' . esc_attr($post_title) . '" />' . "\n";
+        }
+        
+        echo '<meta name="twitter:card" content="' . (!empty($og_image) ? 'summary_large_image' : 'summary') . '" />' . "\n";
+        echo '<meta name="twitter:title" content="' . esc_attr($post_title) . '" />' . "\n";
+        echo '<meta name="twitter:description" content="' . esc_attr($og_description) . '" />' . "\n";
+        if (!empty($og_image)) {
+            echo '<meta name="twitter:image" content="' . esc_url($og_image) . '" />' . "\n";
+        }
+    }
+    
+    public function maybe_serve_secure_audio() {
+        $request_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
+        if (strpos($request_uri, '/secure-audio/') !== false) {
+            $this->dispatch_secure_audio_request();
+        }
+    }
+    
     public function handle_secure_audio() {
-        // Handle chunked audio requests
         if (isset($_GET['secure_audio']) && isset($_GET['id'])) {
-            $request_uri = $_SERVER['REQUEST_URI'];
-            
-            // Check URL patterns first (fallback method)
-            if (strpos($request_uri, '/metadata/') !== false) {
-                $this->handle_audio_metadata();
+            $this->dispatch_secure_audio_request();
+        }
+    }
+    
+    private function dispatch_secure_audio_request() {
+        $request_uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '';
+        
+        if (strpos($request_uri, '/secure-audio/') !== false) {
+            if (strpos($request_uri, '/metadata') !== false) {
+                preg_match('/\/secure-audio\/(\d+)\/metadata/', $request_uri, $matches);
+                if (!empty($matches[1])) {
+                    $_GET['id'] = intval($matches[1]);
+                    $this->handle_audio_metadata();
+                }
                 return;
             }
             
             if (strpos($request_uri, '/chunk/') !== false) {
-                $this->handle_audio_chunk();
+                preg_match('/\/secure-audio\/(\d+)\/chunk\/(\d+)/', $request_uri, $matches);
+                if (!empty($matches[1]) && isset($matches[2])) {
+                    $_GET['id'] = intval($matches[1]);
+                    $_GET['chunk'] = intval($matches[2]);
+                    $this->handle_audio_chunk();
+                }
                 return;
             }
             
-            // Try type parameter method
-            $type = isset($_GET['type']) ? $_GET['type'] : 'full';
-            
-            switch ($type) {
-                case 'metadata':
-                    $this->handle_audio_metadata();
-                    break;
-                case 'chunk':
-                    $this->handle_audio_chunk();
-                    break;
-                case 'full':
-                default:
-                    $this->handle_full_audio();
-                    break;
+            preg_match('/\/secure-audio\/(\d+)\/?/', $request_uri, $matches);
+            if (!empty($matches[1])) {
+                $_GET['id'] = intval($matches[1]);
+                $this->handle_full_audio();
             }
+            return;
         }
+        
+        $type = isset($_GET['type']) ? $_GET['type'] : 'full';
+        
+        switch ($type) {
+            case 'metadata':
+                $this->handle_audio_metadata();
+                break;
+            case 'chunk':
+                $this->handle_audio_chunk();
+                break;
+            case 'full':
+            default:
+                $this->handle_full_audio();
+                break;
+        }
+    }
+    
+    private function clean_output_buffers() {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+    }
+    
+    private function disable_compression() {
+        if (function_exists('apache_setenv')) {
+            @apache_setenv('no-gzip', '1');
+        }
+        @ini_set('zlib.output_compression', '0');
+    }
+    
+    private function get_audio_mime_type($file_path) {
+        $file_extension = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
+        
+        switch ($file_extension) {
+            case 'wav':
+                return 'audio/wav';
+            case 'ogg':
+                return 'audio/ogg';
+            case 'm4a':
+                return 'audio/mp4';
+            case 'mp3':
+            default:
+                return 'audio/mpeg';
+        }
+    }
+    
+    private function send_audio_stream_headers() {
+        header('X-Content-Type-Options: nosniff');
+        header('Accept-Ranges: bytes');
+        header('Cache-Control: no-cache, no-store, must-revalidate');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        header('X-Frame-Options: DENY');
     }
     
     public function handle_audio_metadata() {
@@ -378,6 +502,9 @@ class WPAudioTracks {
             'chunkSize' => $chunk_size,
             'fileSize' => $file_size
         );
+        
+        $this->clean_output_buffers();
+        $this->disable_compression();
         
         header('Content-Type: application/json');
         header('Cache-Control: no-cache, no-store, must-revalidate');
@@ -451,6 +578,9 @@ class WPAudioTracks {
         // Obfuscate the chunk data
         $obfuscated_data = $this->obfuscate_chunk($chunk_data);
         
+        $this->clean_output_buffers();
+        $this->disable_compression();
+        
         // Serve obfuscated chunk
         header('Content-Type: application/octet-stream');
         header('Content-Length: ' . strlen($obfuscated_data));
@@ -488,114 +618,72 @@ class WPAudioTracks {
             wp_die('File not found: ' . $file_path);
         }
         
-        // Determine correct MIME type based on file extension
-        $file_extension = strtolower(pathinfo($file_path, PATHINFO_EXTENSION));
-        $mime_type = 'audio/mpeg'; // default
+        $file_size = filesize($file_path);
+        $mime_type = $this->get_audio_mime_type($file_path);
         
-        switch ($file_extension) {
-            case 'mp3':
-                $mime_type = 'audio/mpeg';
-                break;
-            case 'wav':
-                $mime_type = 'audio/wav';
-                break;
-            case 'ogg':
-                $mime_type = 'audio/ogg';
-                break;
+        $this->clean_output_buffers();
+        $this->disable_compression();
+        $this->send_audio_stream_headers();
+        
+        if (!empty($_SERVER['HTTP_RANGE'])) {
+            $this->serve_audio_range($file_path, $mime_type, $file_size);
         }
         
-        // Serve file with security headers
         header('Content-Type: ' . $mime_type);
-        header('Content-Length: ' . filesize($file_path));
-        header('Accept-Ranges: bytes');
-        header('X-Content-Type-Options: nosniff');
-        header('Cache-Control: no-cache, no-store, must-revalidate');
-        header('Pragma: no-cache');
-        header('Expires: 0');
-        header('X-Frame-Options: DENY');
-        
-        // Handle range requests for audio streaming
-        if (isset($_SERVER['HTTP_RANGE'])) {
-            $this->handle_range_request($file_path, $mime_type);
-        } else {
-            readfile($file_path);
-        }
+        header('Content-Length: ' . $file_size);
+        http_response_code(200);
+        readfile($file_path);
         exit;
     }
     
-    private function handle_range_request($file_path, $mime_type) {
-        $file_size = filesize($file_path);
-        $range = $_SERVER['HTTP_RANGE'];
-        
-        if (preg_match('/bytes=(\d+)-(\d*)/', $range, $matches)) {
-            $start = intval($matches[1]);
-            $end = $matches[2] ? intval($matches[2]) : $file_size - 1;
-            
-            if ($start >= $file_size || $end >= $file_size || $start > $end) {
-                status_header(416);
-                exit;
-            }
-            
-            $length = $end - $start + 1;
-            
-            header('HTTP/1.1 206 Partial Content');
-            header('Content-Range: bytes ' . $start . '-' . $end . '/' . $file_size);
-            header('Content-Length: ' . $length);
-            header('Content-Type: ' . $mime_type);
-            
-            $file = fopen($file_path, 'rb');
-            fseek($file, $start);
-            $buffer_size = 8192;
-            
-            while (!feof($file) && ($pos = ftell($file)) <= $end) {
-                if ($pos + $buffer_size > $end) {
-                    $buffer_size = $end - $pos + 1;
-                }
-                echo fread($file, $buffer_size);
-                flush();
-            }
-            fclose($file);
+    private function serve_audio_range($file_path, $mime_type, $file_size) {
+        if (!preg_match('/bytes=(\d+)-(\d*)/', $_SERVER['HTTP_RANGE'], $matches)) {
+            status_header(416);
+            exit;
         }
-    }
-    
-    public function handle_secure_audio_alt() {
-        // Alternative method that checks the current URL and handles routing directly
-        $request_uri = $_SERVER['REQUEST_URI'];
         
-        // Check if this is a secure audio request
-        if (strpos($request_uri, '/secure-audio/') !== false) {
-            // Check for metadata request
-            if (strpos($request_uri, '/metadata') !== false) {
-                preg_match('/\/secure-audio\/(\d+)\/metadata/', $request_uri, $matches);
-                if (isset($matches[1])) {
-                    $_GET['id'] = intval($matches[1]);
-                    $_GET['type'] = 'metadata';
-                    $this->handle_audio_metadata();
-                    return;
-                }
-            }
-            
-            // Check for chunk request
-            if (strpos($request_uri, '/chunk/') !== false) {
-                preg_match('/\/secure-audio\/(\d+)\/chunk\/(\d+)/', $request_uri, $matches);
-                if (isset($matches[1]) && isset($matches[2])) {
-                    $_GET['id'] = intval($matches[1]);
-                    $_GET['chunk'] = intval($matches[2]);
-                    $_GET['type'] = 'chunk';
-                    $this->handle_audio_chunk();
-                    return;
-                }
-            }
-            
-            // Default to full audio
-            preg_match('/\/secure-audio\/(\d+)\/?/', $request_uri, $matches);
-            if (isset($matches[1])) {
-                $_GET['id'] = intval($matches[1]);
-                $_GET['type'] = 'full';
-                $this->handle_full_audio();
-                return;
-            }
+        $start = (int) $matches[1];
+        $end = $matches[2] !== '' ? (int) $matches[2] : $file_size - 1;
+        $end = min($end, $file_size - 1);
+        
+        if ($start > $end || $start >= $file_size) {
+            status_header(416);
+            header('Content-Range: bytes */' . $file_size);
+            exit;
         }
+        
+        $length = $end - $start + 1;
+        
+        http_response_code(206);
+        header('Content-Type: ' . $mime_type);
+        header('Content-Length: ' . $length);
+        header('Content-Range: bytes ' . $start . '-' . $end . '/' . $file_size);
+        
+        $handle = fopen($file_path, 'rb');
+        if ($handle === false) {
+            status_header(500);
+            exit;
+        }
+        
+        fseek($handle, $start);
+        
+        $bytes_remaining = $length;
+        $chunk_size = 8192;
+        
+        while ($bytes_remaining > 0 && !feof($handle)) {
+            $read_size = min($chunk_size, $bytes_remaining);
+            $buffer = fread($handle, $read_size);
+            
+            if ($buffer === false) {
+                break;
+            }
+            
+            echo $buffer;
+            $bytes_remaining -= strlen($buffer);
+        }
+        
+        fclose($handle);
+        exit;
     }
     
     public function add_test_endpoint() {

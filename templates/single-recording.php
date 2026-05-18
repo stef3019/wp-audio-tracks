@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * Single Recording Template
  * 
@@ -8,98 +8,13 @@
 
 get_header(); ?>
 
-<?php 
-// Add Open Graph meta tags for social media sharing
-global $post;
-if ($post && $post->post_type === 'recording') :
-    
-    // Get post data without calling the_post() to avoid interfering with main loop
-    $post_title = get_the_title($post->ID);
-    $post_url = get_permalink($post->ID);
-    $session = get_post_meta($post->ID, '_recording_session', true);
-    $speaker = get_post_meta($post->ID, '_recording_speaker', true);
-    $post_content = $post->post_content;
-
-    // Create description from session + speaker + content
-    $og_description = '';
-    if (!empty($session)) {
-        $og_description .= $session;
-    }
-    if (!empty($speaker)) {
-        if (!empty($og_description)) {
-            $og_description .= ' - ';
-        }
-        $og_description .= $speaker;
-    }
-
-    if (!empty($post_content)) {
-        if (!empty($og_description)) {
-            $og_description .= ' - ';
-        }
-        // Strip HTML tags and limit length
-        $clean_content = wp_strip_all_tags($post_content);
-        $og_description .= $clean_content;
-    }
-    
-    // Limit description length for social media (optimal is 155-160 characters)
-    if (strlen($og_description) > 155) {
-        $og_description = substr($og_description, 0, 152) . '...';
-    }
-    
-    // Get featured image
-    $og_image = '';
-    if (has_post_thumbnail($post->ID)) {
-        $thumbnail_id = get_post_thumbnail_id($post->ID);
-        $og_image = wp_get_attachment_image_url($thumbnail_id, 'large');
-    }
-    
-    // Get site name and description
-    $site_name = get_bloginfo('name');
-    $site_description = get_bloginfo('description');
-    
-    // Output Open Graph meta tags
-    echo '<meta property="og:type" content="article" />' . "\n";
-    echo '<meta property="og:title" content="' . esc_attr($post_title) . '" />' . "\n";
-    echo '<meta property="og:description" content="' . esc_attr($og_description) . '" />' . "\n";
-    echo '<meta property="og:url" content="' . esc_url($post_url) . '" />' . "\n";
-    echo '<meta property="og:site_name" content="' . esc_attr($site_name) . '" />' . "\n";
-    
-    if (!empty($og_image)) {
-        echo '<meta property="og:image" content="' . esc_url($og_image) . '" />' . "\n";
-        echo '<meta property="og:image:width" content="1200" />' . "\n";
-        echo '<meta property="og:image:height" content="630" />' . "\n";
-        echo '<meta property="og:image:alt" content="' . esc_attr($post_title) . '" />' . "\n";
-    }
-    
-    // Twitter Card meta tags
-    echo '<meta name="twitter:card" content="summary_large_image" />' . "\n";
-    echo '<meta name="twitter:title" content="' . esc_attr($post_title) . '" />' . "\n";
-    echo '<meta name="twitter:description" content="' . esc_attr($og_description) . '" />' . "\n";
-    if (!empty($og_image)) {
-        echo '<meta name="twitter:image" content="' . esc_url($og_image) . '" />' . "\n";
-    }
-    
-    // Additional meta tags
-    echo '<meta property="article:published_time" content="' . get_the_date('c', $post->ID) . '" />' . "\n";
-    echo '<meta property="article:modified_time" content="' . get_the_modified_date('c', $post->ID) . '" />' . "\n";
-    
-    // Add section tags
-    $sections = get_the_terms($post->ID, 'section');
-    if ($sections && !is_wp_error($sections)) {
-        foreach ($sections as $section) {
-            echo '<meta property="article:tag" content="' . esc_attr($section->name) . '" />' . "\n";
-        }
-    }
-endif;
-?>
-
 <div class="wp-audio-tracks-container">
     <div class="theme-toggle-container">
         <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
-            <span class="theme-toggle-icon light-icon">☀️</span>
-            <span class="theme-toggle-icon dark-icon">🌙</span>
+            <span class="theme-toggle-icon light-icon" aria-hidden="true">&#9728;&#65039;</span>
+            <span class="theme-toggle-icon dark-icon" aria-hidden="true">&#127769;</span>
         </button>
-    </div>
+    </div> 
     
     <div class="recording-content">
         
@@ -118,7 +33,7 @@ endif;
                     <div class="recording-player-container">
                         <div class="player-header">
                           
-                            <div class="security-icon">🔒</div>
+                            <div class="security-icon" role="img" aria-label="<?php esc_attr_e('Protected audio', 'wp-audio-tracks'); ?>"></div>
                         </div>
                         
                         <div class="secure-audio-player" data-recording-id="<?php echo get_the_ID(); ?>">
@@ -167,11 +82,11 @@ endif;
                         <div class="recording-sections">
                             <strong><?php _e('Section(s):', 'wp-audio-tracks'); ?></strong>
                             <?php 
-                            $section_links = array();
+                            $section_names = array();
                             foreach ($sections as $section) {
-                                $section_links[] = '<a href="' . get_term_link($section) . '">' . esc_html($section->name) . '</a>';
+                                $section_names[] = esc_html($section->name);
                             }
-                            echo implode(', ', $section_links);
+                            echo implode(', ', $section_names);
                             ?>
                         </div>
                     <?php endif; ?>
@@ -210,36 +125,6 @@ endif;
                 </footer>
                 
             </article>
-            
-            <?php
-            // Navigation to other recordings
-            $prev_post = get_previous_post(true, '', 'section');
-            $next_post = get_next_post(true, '', 'section');
-            
-            if ($prev_post || $next_post) : ?>
-                <nav class="recording-navigation">
-                    <div class="nav-links">
-                        <?php if ($prev_post) : ?>
-                            <div class="nav-previous">
-                                <a href="<?php echo get_permalink($prev_post->ID); ?>" rel="prev">
-                                    <span class="nav-subtitle"><?php _e('Previous Recording', 'wp-audio-tracks'); ?></span>
-                                    <span class="nav-title"><?php echo get_the_title($prev_post->ID); ?></span>
-                                </a>
-                            </div>
-                        <?php endif; ?>
-                        
-                        <?php if ($next_post) : ?>
-                            <div class="nav-next">
-                                <a href="<?php echo get_permalink($next_post->ID); ?>" rel="next">
-                                    <span class="nav-subtitle"><?php _e('Next Recording', 'wp-audio-tracks'); ?></span>
-                                    <span class="nav-title"><?php echo get_the_title($next_post->ID); ?></span>
-                                </a>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </nav>
-            <?php endif; ?>
-            
         <?php endwhile; ?>
         
     </div>
